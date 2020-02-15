@@ -24,4 +24,21 @@ public interface FriendsExporterConfig extends Config
 	{
 		return "-";
 	}
+	@ConfigItem(
+			keyName = "unrank",
+			name = "Show unranked players",
+			description = "Shows players that do not have a rank but are still friends in ranks export.",
+			position = 3
+	)
+	default boolean showUnranked()
+	{
+		return false;
+	}
+	@ConfigItem(
+			keyName = "line",
+			name = "Separate lines",
+			description = "Separates entrys with new lines.",
+			position = 4
+	)
+	default boolean newLine()	{return false;}
 }
