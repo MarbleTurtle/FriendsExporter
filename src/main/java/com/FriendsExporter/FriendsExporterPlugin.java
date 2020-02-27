@@ -24,7 +24,11 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Date;
 
 @Slf4j
 @PluginDescriptor(
@@ -39,6 +43,7 @@ public class FriendsExporterPlugin extends Plugin {
 	private static final WidgetMenuOption Bottom_Ignore_List;
 	private static final WidgetMenuOption Fixed_Clan_List;
 	private static final WidgetMenuOption Resizable_Clan_List;
+	private static final DateFormat TIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
 	private boolean clan=false;
 	private boolean wid=false;
 	@Inject
@@ -58,6 +63,12 @@ public class FriendsExporterPlugin extends Plugin {
 		removeShiftClickCustomizationMenus();
 	}
 
+	static String format(Date date) {
+		synchronized(TIME_FORMAT) {
+			return TIME_FORMAT.format(date);
+		}
+	}
+
 	@Subscribe
 	public void onWidgetMenuOptionClicked(WidgetMenuOptionClicked event) throws Exception {
 		if (event.getWidget() == WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB || event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB||event.getWidget() == WidgetInfo.FIXED_VIEWPORT_CLAN_CHAT_TAB||event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_CLAN_CHAT_TAB) {
@@ -66,7 +77,11 @@ public class FriendsExporterPlugin extends Plugin {
 			} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Ignore List")) {
 				exportIgnoreList();
 			} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Rank List")) {
-				exportRankList();
+				if(clan) {
+					exportRankList();
+				}else{
+					this.client.addChatMessage(ChatMessageType.GAMEMESSAGE,"","Please open Clan Setup found in Clan Chat tab to export this list.","");
+				}
 			}
 			refreshShiftClickCustomizationMenus();
 		}
@@ -80,10 +95,8 @@ public class FriendsExporterPlugin extends Plugin {
 		this.menuManager.addManagedCustomMenu(FIXED_Ignore_List);
 		this.menuManager.addManagedCustomMenu(Resizable_Ignore_List);
 		this.menuManager.addManagedCustomMenu(Bottom_Ignore_List);
-		if(clan){
-			this.menuManager.addManagedCustomMenu(Fixed_Clan_List);
-			this.menuManager.addManagedCustomMenu(Resizable_Clan_List);
-		}
+		this.menuManager.addManagedCustomMenu(Fixed_Clan_List);
+		this.menuManager.addManagedCustomMenu(Resizable_Clan_List);
 	}
 
 	private void removeShiftClickCustomizationMenus() {
@@ -98,7 +111,7 @@ public class FriendsExporterPlugin extends Plugin {
 	}
 
 	private void exportFriendsList() throws Exception {
-		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getLocalPlayer().getName() + " Friends " + LocalDate.now() + ".txt";
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getLocalPlayer().getName() + " Friends " + format(new Date()) + ".txt";
 		purgeList(fileName);
 		Friend array[] = this.client.getFriendContainer().getMembers();
 		FileWriter writer = new FileWriter(fileName, true);
@@ -119,7 +132,7 @@ public class FriendsExporterPlugin extends Plugin {
 	}
 
 	private void exportRankList() throws Exception {
-		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getLocalPlayer().getName() + " Ranks " + LocalDate.now() + ".txt";
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getLocalPlayer().getName() + " Ranks " + format(new Date()) + ".txt";
 		purgeList(fileName);
 		Friend array[] = this.client.getFriendContainer().getMembers();
 		Widget temp=null;
@@ -157,7 +170,7 @@ public class FriendsExporterPlugin extends Plugin {
 	}
 
 	private void exportIgnoreList() throws Exception {
-		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getLocalPlayer().getName() + " Ignore " + LocalDate.now() + ".txt";
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getLocalPlayer().getName() + " Ignore " + format(new Date()) + ".txt";
 		purgeList(fileName);
 		Ignore array[] = this.client.getIgnoreContainer().getMembers();
 		FileWriter writer = new FileWriter(fileName, true);
@@ -245,13 +258,6 @@ public class FriendsExporterPlugin extends Plugin {
 	@Provides
 	FriendsExporterConfig provideConfig(ConfigManager configManager) {
 		return configManager.getConfig(FriendsExporterConfig.class);
-	}
-
-	@Subscribe
-	public void onConfigChanged(ConfigChanged event) {
-		if (event.getGroup().equals("ClanChatPlus")) {
-
-		}
 	}
 
 	@Subscribe
