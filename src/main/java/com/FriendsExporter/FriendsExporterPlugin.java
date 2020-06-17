@@ -71,7 +71,7 @@ public class FriendsExporterPlugin extends Plugin {
 
 	@Subscribe
 	public void onWidgetMenuOptionClicked(WidgetMenuOptionClicked event) throws Exception {
-		if (event.getWidget() == WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB || event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB||event.getWidget() == WidgetInfo.FIXED_VIEWPORT_CLAN_CHAT_TAB||event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_CLAN_CHAT_TAB) {
+		if (event.getWidget() == WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB || event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB||event.getWidget() == WidgetInfo.FIXED_VIEWPORT_FRIENDS_CHAT_TAB||event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_CHAT_TAB) {
 			if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Friends List")) {
 				exportFriendsList();
 			} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Ignore List")) {
@@ -80,7 +80,7 @@ public class FriendsExporterPlugin extends Plugin {
 				if(clan) {
 					exportRankList();
 				}else{
-					this.client.addChatMessage(ChatMessageType.GAMEMESSAGE,"","Please open Clan Setup found in Clan Chat tab to export this list.","");
+					this.client.addChatMessage(ChatMessageType.GAMEMESSAGE,"","Please open Clan Setup found in Friends Chat tab to export this list.","");
 				}
 			}
 			refreshShiftClickCustomizationMenus();
@@ -251,8 +251,8 @@ public class FriendsExporterPlugin extends Plugin {
 		FIXED_Ignore_List = new WidgetMenuOption("Export", "Ignore List", WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB);
 		Resizable_Ignore_List = new WidgetMenuOption("Export", "Ignore List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB);
 		Bottom_Ignore_List = new WidgetMenuOption("Export", "Ignore List", WidgetInfo.RESIZABLE_VIEWPORT_BOTTOM_LINE_FRIEND_ICON);
-		Fixed_Clan_List = new WidgetMenuOption("Export", "Rank List", WidgetInfo.FIXED_VIEWPORT_CLAN_CHAT_TAB);
-		Resizable_Clan_List = new WidgetMenuOption("Export", "Rank List", WidgetInfo.RESIZABLE_VIEWPORT_CLAN_CHAT_TAB);
+		Fixed_Clan_List = new WidgetMenuOption("Export", "Rank List", WidgetInfo.FIXED_VIEWPORT_FRIENDS_CHAT_TAB);
+		Resizable_Clan_List = new WidgetMenuOption("Export", "Rank List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_CHAT_TAB);
 	}
 
 	@Provides
