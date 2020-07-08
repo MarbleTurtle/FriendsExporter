@@ -118,7 +118,7 @@ public class FriendsExporterPlugin extends Plugin {
 		for (int x = 0; x != this.client.getFriendContainer().getMembers().length; x++) {
 			String friendName = array[x].getName();
 			String prevName = "";
-			if (!StringUtils.isEmpty(array[x].getPrevName())) {
+			if (!StringUtils.isEmpty(array[x].getPrevName())&&this.config.prevName()) {
 				prevName = array[x].getPrevName();
 			}
 			String Writing = toWrite(x + 1, friendName, prevName,"");
@@ -147,7 +147,7 @@ public class FriendsExporterPlugin extends Plugin {
 				for (int y = 0; y != this.client.getFriendContainer().getMembers().length; y++) {
 					String friendName = array[y].getName();
 					if (friendName.equals(temp2[(x * 4) + 2].getText())) {
-						if (!StringUtils.isEmpty(array[y].getPrevName())) {
+						if (!StringUtils.isEmpty(array[y].getPrevName())&&this.config.prevName()) {
 							prevName = array[y].getPrevName();
 						}
 						break;
@@ -177,7 +177,7 @@ public class FriendsExporterPlugin extends Plugin {
 		for (int x = 0; x != this.client.getIgnoreContainer().getMembers().length; x++) {
 			String friendName = array[x].getName();
 			String prevName = "";
-			if (!StringUtils.isEmpty(array[x].getPrevName())) {
+			if (!StringUtils.isEmpty(array[x].getPrevName())&&this.config.prevName()) {
 				prevName = array[x].getPrevName();
 			}
 			String Writing = toWrite(x + 1, friendName, prevName,"");
@@ -197,14 +197,9 @@ public class FriendsExporterPlugin extends Plugin {
 
 	private String toWrite(Integer Num, String firstName, String lastName, String rank) {
 		String export = "";
-		String Separator = "";
 		String Role="";
-		if (this.config.Separator() == "") {
-			Separator = "-";
-		} else {
-			Separator = this.config.Separator();
-		}
-		if(this.config.newLine()){
+		String Separator = this.config.Separator();
+		if(this.config.newLine()&&this.config.prevName()){
 			Separator="\n"+Separator;
 		}
 		if(!rank.isEmpty()){
