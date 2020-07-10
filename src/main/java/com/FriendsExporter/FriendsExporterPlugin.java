@@ -196,6 +196,8 @@ public class FriendsExporterPlugin extends Plugin {
 	}
 
 	private String toWrite(Integer Num, String firstName, String lastName, String rank) {
+	    firstName=firstName.replace('\u00A0', ' ');
+	    lastName=lastName.replace('\u00A0', ' ');
 		String export = "";
 		String Role="";
 		String Separator = this.config.Separator();
