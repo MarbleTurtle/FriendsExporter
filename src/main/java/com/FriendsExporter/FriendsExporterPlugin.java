@@ -28,7 +28,9 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 @Slf4j
 @PluginDescriptor(
@@ -37,17 +39,23 @@ import java.util.Date;
 public class FriendsExporterPlugin extends Plugin {
 	private static final WidgetMenuOption FIXED_Friends_List;
 	private static final WidgetMenuOption Resizable_Friends_List;
-	private static final WidgetMenuOption Bottom_Friends_List;
+	//private static final WidgetMenuOption Modern_Friends_List;
 	private static final WidgetMenuOption FIXED_Ignore_List;
 	private static final WidgetMenuOption Resizable_Ignore_List;
-	private static final WidgetMenuOption Bottom_Ignore_List;
+	//private static final WidgetMenuOption Modern_Ignore_List;
 	private static final WidgetMenuOption Fixed_Clan_List;
 	private static final WidgetMenuOption Resizable_Clan_List;
+	//private static final WidgetMenuOption Modern_Clan_List;
 	private static final WidgetMenuOption Fixed_Clan_List_List;
 	private static final WidgetMenuOption Resizable_Clan_List_List;
+	//private static final WidgetMenuOption Modern_Clan_List_List;
+	private static final WidgetMenuOption Fixed_Emote;
+	private static final WidgetMenuOption Resizable_Emote;
+	//private static final WidgetMenuOption Modern_Emote;
 	private static final DateFormat TIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
 	private boolean clan=false;
 	private boolean wid=false;
+	private List<Player> localPlayers = new ArrayList<>();
 	@Inject
 	private Client client;
 	@Inject
@@ -73,53 +81,55 @@ public class FriendsExporterPlugin extends Plugin {
 
 	@Subscribe
 	public void onWidgetMenuOptionClicked(WidgetMenuOptionClicked event) throws Exception {
-		if (event.getWidget() == WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB || event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB||event.getWidget() == WidgetInfo.FIXED_VIEWPORT_FRIENDS_CHAT_TAB||event.getWidget() == WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_CHAT_TAB) {
-			if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Friends List")) {
-				exportFriendsList();
-			} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Ignore List")) {
-				exportIgnoreList();
-			} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Rank List")) {
-				if(clan) {
-					exportRankList();
-				}else{
-					this.client.addChatMessage(ChatMessageType.GAMEMESSAGE,"","Please open Clan Setup found in Friends Chat tab to export this list.","");
-				}
-			} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Current Members")) {
-				if(this.client.getFriendsChatManager()!=null) {
-					exportClanList();
-				}else{
-					this.client.addChatMessage(ChatMessageType.GAMEMESSAGE,"","Please join a Friends Chat to export this list.","");
-				}
+		if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Friends List")) {
+			exportFriendsList();
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Ignore List")) {
+			exportIgnoreList();
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Rank List")) {
+			if(clan) {
+				exportRankList();
+			}else{
+				this.client.addChatMessage(ChatMessageType.GAMEMESSAGE,"","Please open Clan Setup found in Friends Chat tab to export this list.","");
 			}
-			refreshShiftClickCustomizationMenus();
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Current Members")) {
+			if(this.client.getFriendsChatManager()!=null) {
+				exportClanList();
+			}else{
+				this.client.addChatMessage(ChatMessageType.GAMEMESSAGE,"","Please join a Friends Chat to export this list.","");
+			}
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Local Players")) {
+			exportLocalPlayers();
 		}
+		refreshShiftClickCustomizationMenus();
 	}
 
 	private void refreshShiftClickCustomizationMenus() {
 		this.removeShiftClickCustomizationMenus();
 		this.menuManager.addManagedCustomMenu(FIXED_Friends_List);
 		this.menuManager.addManagedCustomMenu(Resizable_Friends_List);
-		this.menuManager.addManagedCustomMenu(Bottom_Friends_List);
+		//this.menuManager.addManagedCustomMenu(Modern_Friends_List);
 		this.menuManager.addManagedCustomMenu(FIXED_Ignore_List);
 		this.menuManager.addManagedCustomMenu(Resizable_Ignore_List);
-		this.menuManager.addManagedCustomMenu(Bottom_Ignore_List);
+		//this.menuManager.addManagedCustomMenu(Modern_Ignore_List);
 		this.menuManager.addManagedCustomMenu(Fixed_Clan_List);
 		this.menuManager.addManagedCustomMenu(Resizable_Clan_List);
 		this.menuManager.addManagedCustomMenu(Fixed_Clan_List_List);
 		this.menuManager.addManagedCustomMenu(Resizable_Clan_List_List);
+		this.menuManager.addManagedCustomMenu(Fixed_Emote);
+		this.menuManager.addManagedCustomMenu(Resizable_Emote);
 	}
 
 	private void removeShiftClickCustomizationMenus() {
 		this.menuManager.removeManagedCustomMenu(FIXED_Friends_List);
 		this.menuManager.removeManagedCustomMenu(Resizable_Friends_List);
-		this.menuManager.removeManagedCustomMenu(Bottom_Friends_List);
+		//this.menuManager.removeManagedCustomMenu(Modern_Friends_List);
 		this.menuManager.removeManagedCustomMenu(FIXED_Ignore_List);
 		this.menuManager.removeManagedCustomMenu(Resizable_Ignore_List);
-		this.menuManager.removeManagedCustomMenu(Bottom_Ignore_List);
+		//this.menuManager.removeManagedCustomMenu(Modern_Ignore_List);
 		this.menuManager.removeManagedCustomMenu(Fixed_Clan_List);
 		this.menuManager.removeManagedCustomMenu(Resizable_Clan_List);
-		this.menuManager.removeManagedCustomMenu(Fixed_Clan_List_List);
-		this.menuManager.removeManagedCustomMenu(Resizable_Clan_List_List);
+		this.menuManager.removeManagedCustomMenu(Fixed_Emote);
+		this.menuManager.removeManagedCustomMenu(Resizable_Emote);
 	}
 
 	private void exportFriendsList() throws Exception {
@@ -221,6 +231,25 @@ public class FriendsExporterPlugin extends Plugin {
 		writer.close();
 	}
 
+	private void exportLocalPlayers() throws Exception {
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getLocalPlayer().getName() + " Local " + format(new Date()) + ".txt";
+		purgeList(fileName);
+		List<Player> array = this.client.getPlayers();
+		FileWriter writer = new FileWriter(fileName, true);
+		for (int x = 0; x != array.size(); x++) {
+			String localName = array.get(x).getName();
+			if(!localName.matches(client.getLocalPlayer().getName())) {
+				String Writing = toWrite(x + 1, localName, "", "");
+				try {
+					writer.write(Writing + "\r\n");
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		writer.close();
+	}
+
 	private void purgeList(String fileName) {
 		File purge = new File(fileName);
 		purge.delete();
@@ -275,14 +304,19 @@ public class FriendsExporterPlugin extends Plugin {
 	static {
 		FIXED_Friends_List = new WidgetMenuOption("Export", "Friends List", WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB);
 		Resizable_Friends_List = new WidgetMenuOption("Export", "Friends List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB);
-		Bottom_Friends_List = new WidgetMenuOption("Export", "Friends List", WidgetInfo.RESIZABLE_VIEWPORT_BOTTOM_LINE_FRIEND_ICON);
+		//Modern_Friends_List = new WidgetMenuOption("Export", "Friends List", WidgetInfo.RESIZABLE_VIEWPORT_BOTTOM_LINE_FRIEND_ICON);
 		FIXED_Ignore_List = new WidgetMenuOption("Export", "Ignore List", WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB);
 		Resizable_Ignore_List = new WidgetMenuOption("Export", "Ignore List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB);
-		Bottom_Ignore_List = new WidgetMenuOption("Export", "Ignore List", WidgetInfo.RESIZABLE_VIEWPORT_BOTTOM_LINE_FRIEND_ICON);
+		//Modern_Ignore_List = new WidgetMenuOption("Export", "Ignore List", WidgetInfo.RESIZABLE_VIEWPORT_BOTTOM_LINE_FRIEND_ICON);
 		Fixed_Clan_List = new WidgetMenuOption("Export", "Rank List", WidgetInfo.FIXED_VIEWPORT_FRIENDS_CHAT_TAB);
 		Resizable_Clan_List = new WidgetMenuOption("Export", "Rank List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_CHAT_TAB);
+		//Modern_Clan_List = new WidgetMenuOption("Export", "Rank List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_CHAT_TAB);
 		Fixed_Clan_List_List = new WidgetMenuOption("Export", "Current Members", WidgetInfo.FIXED_VIEWPORT_FRIENDS_CHAT_TAB);
 		Resizable_Clan_List_List = new WidgetMenuOption("Export", "Current Members", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_CHAT_TAB);
+		//Modern_Clan_List_List = new WidgetMenuOption("Export", "Current Members", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_CHAT_TAB);
+		Fixed_Emote = new WidgetMenuOption("Export", "Local Players", WidgetInfo.FIXED_VIEWPORT_EMOTES_TAB);
+		Resizable_Emote = new WidgetMenuOption("Export", "Local Players", WidgetInfo.RESIZABLE_VIEWPORT_EMOTES_TAB);
+		//Modern_Emote = new WidgetMenuOption("Export", "Local Players", WidgetInfo.RESIZABLE_VIEWPORT_EMOTES_TAB);
 	}
 
 	@Provides
