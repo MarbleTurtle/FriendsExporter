@@ -29,7 +29,7 @@ public interface FriendsExporterConfig extends Config
 	)
 	default String Separator()
 	{
-		return "-";
+		return "/";
 	}
 	@ConfigItem(
 			keyName = "unrank",
@@ -48,4 +48,19 @@ public interface FriendsExporterConfig extends Config
 			position = 5
 	)
 	default boolean newLine()	{return false;}
+	@ConfigItem(
+			keyName = "1",
+			name = "Separate lines",
+			description = "Separates entrys with new lines.",
+			position = 6
+	)
+	default int newWid()	{return 0;}
+	@ConfigItem(
+			keyName = "2",
+			name = "Separate lines",
+			description = "Separates entrys with new lines.",
+			position = 7
+	)
+	default int newGet()	{return 0;}
+
 }
