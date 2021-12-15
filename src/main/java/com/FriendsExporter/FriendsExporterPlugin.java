@@ -101,6 +101,14 @@ public class FriendsExporterPlugin extends Plugin {
 			}
 		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Local Players")) {
 			exportLocalPlayers();
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Clan Members")) {
+			exportClanMembers();
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Clan Join Order")) {
+			exportClanJoinOrder();
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Clan Bans")) {
+			exportClanBanList();
+		} else if (event.getMenuOption().equals("Export") && Text.removeTags(event.getMenuTarget()).equals("Clan Events")) {
+			exportClanEventList();
 		}
 		refreshShiftClickCustomizationMenus();
 	}
@@ -252,6 +260,99 @@ public class FriendsExporterPlugin extends Plugin {
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+			}
+		}
+		writer.close();
+	}
+	private void exportClanMembers() throws Exception {
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getClanChannel().getName() + " Members " + format(new Date()) + ".txt";
+		purgeList(fileName);
+		int clansize=client.getWidget(693,10).getDynamicChildren().length/3;
+		FileWriter writer = new FileWriter(fileName, true);
+		writer.write(client.getClanChannel().getName()+this.config.Separator()+client.getWidget(693,7).getDynamicChildren()[4].getText()+this.config.Separator()+client.getWidget(693,8).getDynamicChildren()[4].getText()+"\r\n");
+		for (int x = 0; x != clansize; x++) {
+			String player = client.getWidget(693, 10).getDynamicChildren()[(x*3)+1].getText();
+			String option1 = client.getWidget(693, 11).getDynamicChildren()[clansize+x].getText();
+			String option2 = client.getWidget(693, 13).getDynamicChildren()[clansize+x].getText();
+			String Writing = toWrite(x + 1, option1, option2, player); //might be jank but it do be working
+			try {
+				writer.write(Writing + "\r\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		writer.close();
+	}
+
+	private void exportClanJoinOrder() throws Exception {
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getClanChannel().getName() + " Join Order " + format(new Date()) + ".txt";
+		purgeList(fileName);
+		int clanSize=client.getWidget(693,11).getDynamicChildren().length/2;
+		FileWriter writer = new FileWriter(fileName, true);
+		for (int x = 0; x != clanSize; x++) {
+			String player = Text.removeTags(client.getWidget(693, 11).getDynamicChildren()[x].getName());
+			String Writing = toWrite(x + 1, player, "", "");
+			try {
+				writer.write(Writing + "\r\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		writer.close();
+	}
+
+	private void exportClanBanList() throws Exception {
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getClanChannel().getName() + " Ban List " + format(new Date()) + ".txt";
+		purgeList(fileName);
+		int banSize=client.getWidget(689,6).getDynamicChildren().length/2;
+		FileWriter writer = new FileWriter(fileName, true);
+		for (int x = 0; x != banSize; x++) {
+			String player = Text.removeTags(client.getWidget(689, 6).getDynamicChildren()[500+x].getText());
+			String Writing = toWrite(x + 1, player, "", "");
+			try {
+				writer.write(Writing + "\r\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		writer.close();
+	}
+
+	private void exportClanEventList() throws Exception {
+		String fileName = RuneLite.RUNELITE_DIR + "\\" + this.client.getClanChannel().getName() + " Events " + format(new Date()) + ".txt";
+		purgeList(fileName);
+		int eventSize=client.getWidget(703,11).getDynamicChildren().length;
+		FileWriter writer = new FileWriter(fileName, true);
+		for (int x = 0; x != eventSize; x++) {
+			String world = Text.removeTags(client.getWidget(703, 11).getDynamicChildren()[x].getText());
+			String startDate = Text.removeTags(client.getWidget(703, 12).getDynamicChildren()[x].getText());
+			String startTime = Text.removeTags(client.getWidget(703, 13).getDynamicChildren()[x].getText());
+			String duration = Text.removeTags(client.getWidget(703, 14).getDynamicChildren()[x].getText());
+			String type = Text.removeTags(client.getWidget(703, 15).getDynamicChildren()[x].getText());
+			String focus = Text.removeTags(client.getWidget(703, 16).getDynamicChildren()[x].getText());
+			String subType = Text.removeTags(client.getWidget(703, 17).getDynamicChildren()[x].getText());
+			String ranks = Text.removeTags(client.getWidget(703, 19).getDynamicChildren()[x].getText());
+			String Writing="";
+			switch (this.config.Lineleads()) {
+				case None:
+					Writing = focus+config.Separator()+type+config.Separator()+subType+config.Separator()+startDate+" "+startTime+config.Separator()+duration+config.Separator()+world+config.Separator()+ranks;
+					break;
+				case Number:
+					Writing = x + " " + focus+config.Separator()+type+config.Separator()+subType+config.Separator()+startDate+" "+startTime+config.Separator()+duration+config.Separator()+world+config.Separator()+ranks;
+					break;
+				case Number1:
+					Writing = x + ". " + focus+config.Separator()+type+config.Separator()+subType+config.Separator()+startDate+" "+startTime+config.Separator()+duration+config.Separator()+world+config.Separator()+ranks;
+					break;
+				case Number2:
+					Writing = x + ") " + focus+config.Separator()+type+config.Separator()+subType+config.Separator()+startDate+" "+startTime+config.Separator()+duration+config.Separator()+world+config.Separator()+ranks;
+					break;
+				case Number3:
+					Writing = x + ".) " + focus+config.Separator()+type+config.Separator()+subType+config.Separator()+startDate+" "+startTime+config.Separator()+duration+config.Separator()+world+config.Separator()+ranks;
+			}
+			try {
+				writer.write(Writing + "\r\n");
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 		}
 		writer.close();
