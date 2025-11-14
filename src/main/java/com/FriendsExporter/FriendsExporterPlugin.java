@@ -5,17 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.Friend;
+import net.runelite.api.FriendsChatManager;
 import net.runelite.api.FriendsChatMember;
 import net.runelite.api.Ignore;
 import net.runelite.api.Player;
 import net.runelite.api.clan.ClanChannelMember;
-import net.runelite.api.events.GameTick;
-import net.runelite.api.events.MenuOptionClicked;
-import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.menus.MenuManager;
 import net.runelite.client.menus.WidgetMenuOption;
 import net.runelite.client.plugins.Plugin;
@@ -24,6 +21,7 @@ import net.runelite.client.util.Text;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.inject.Inject;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -33,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import static net.runelite.client.RuneLite.RUNELITE_DIR;
@@ -46,57 +45,34 @@ public class FriendsExporterPlugin extends Plugin {
     private static final String EXPORT = "Export";
     public static final File EXPORT_DIR = new File(RUNELITE_DIR, "player-exports");
 
-    private static final WidgetMenuOption FIXED_FRIENDS_LIST
-            = new WidgetMenuOption(EXPORT, "Friends List", WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB);
+    private static final WidgetMenuOption FRIENDS_LIST
+            = new WidgetMenuOption(EXPORT, "Friends List", InterfaceID.Toplevel.STONE9, InterfaceID.ToplevelOsrsStretch.STONE9, InterfaceID.ToplevelPreEoc.STONE9);
 
-    private static final WidgetMenuOption RESIZABLE_FRIENDS_LIST
-            = new WidgetMenuOption(EXPORT, "Friends List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB);
-
-    private static final WidgetMenuOption MODERN_FRIENDS_LIST
-            = new WidgetMenuOption(EXPORT, "Friends List", 10747943);
-
-    private static final WidgetMenuOption FIXED_IGNORE_LIST
-            = new WidgetMenuOption(EXPORT, "Ignore List", WidgetInfo.FIXED_VIEWPORT_FRIENDS_TAB);
-
-    private static final WidgetMenuOption RESIZABLE_IGNORE_LIST
-            = new WidgetMenuOption(EXPORT, "Ignore List", WidgetInfo.RESIZABLE_VIEWPORT_FRIENDS_TAB);
-
-    private static final WidgetMenuOption MODERN_IGNORE_LIST
-            = new WidgetMenuOption(EXPORT, "Ignore List", 10747943);
+    private static final WidgetMenuOption IGNORE_LIST
+            = new WidgetMenuOption(EXPORT, "Ignore List", InterfaceID.Toplevel.STONE9, InterfaceID.ToplevelOsrsStretch.STONE9, InterfaceID.ToplevelPreEoc.STONE9);
 
     private static final WidgetMenuOption CHAT_CHANNEL_LIST
-            = new WidgetMenuOption(EXPORT, "Current Members", 46333955);
+            = new WidgetMenuOption(EXPORT, "Current Members", InterfaceID.SideChannels.TAB_0);
 
     private static final WidgetMenuOption CHAT_CHANNEL_RANKS
-            = new WidgetMenuOption(EXPORT, "Rank List", 46333955);
+            = new WidgetMenuOption(EXPORT, "Rank List", InterfaceID.SideChannels.TAB_0);
 
     private static final WidgetMenuOption CLAN_CHAT_MEMBERS
-            = new WidgetMenuOption(EXPORT, "Online Clan Members", 46333956);
+            = new WidgetMenuOption(EXPORT, "Online Clan Members", InterfaceID.SideChannels.TAB_1);
 
     private static final WidgetMenuOption CLAN_CHAT_JOINS
-            = new WidgetMenuOption(EXPORT, "All Clan Members", 46333956);
+            = new WidgetMenuOption(EXPORT, "All Clan Members", InterfaceID.SideChannels.TAB_1);
 
     private static final WidgetMenuOption CLAN_CHAT_BANS
-            = new WidgetMenuOption(EXPORT, "Clan Bans", 46333956);
+            = new WidgetMenuOption(EXPORT, "Clan Bans", InterfaceID.SideChannels.TAB_1);
 
     private static final WidgetMenuOption CLAN_CHAT_EVENTS
-            = new WidgetMenuOption(EXPORT, "Clan Events", 46333956);
+            = new WidgetMenuOption(EXPORT, "Clan Events", InterfaceID.SideChannels.TAB_1);
 
-    private static final WidgetMenuOption GUEST_CLAN_CHAT_TITLES
-            = new WidgetMenuOption(EXPORT, "Guest Clan Members", 46333957);
-
-    private static final WidgetMenuOption FIXED_EMOTE
-            = new WidgetMenuOption(EXPORT, "Local Players", WidgetInfo.FIXED_VIEWPORT_EMOTES_TAB);
-
-    private static final WidgetMenuOption RESIZABLE_EMOTE
-            = new WidgetMenuOption(EXPORT, "Local Players", WidgetInfo.RESIZABLE_VIEWPORT_EMOTES_TAB);
-
-    private static final WidgetMenuOption MODERN_EMOTE
-            = new WidgetMenuOption(EXPORT, "Local Players", 10747945);
+    private static final WidgetMenuOption EMOTES
+            = new WidgetMenuOption(EXPORT, "Local Players", InterfaceID.Toplevel.STONE12, InterfaceID.ToplevelOsrsStretch.STONE12, InterfaceID.ToplevelPreEoc.STONE12);
 
     private static final DateFormat TIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-    private boolean chatChannel = false;
-    private boolean wid = false;
     @Inject
     private Client client;
     @Inject
@@ -105,16 +81,18 @@ public class FriendsExporterPlugin extends Plugin {
     private FriendsExporterConfig config;
     @Inject
     private ConfigManager configManager;
+    @Inject
+    private ScheduledExecutorService executor;
 
     @Override
     protected void startUp() throws Exception {
         EXPORT_DIR.mkdirs();
-        refreshShiftClickCustomizationMenus();
+        addCustomOptions();
     }
 
     @Override
     protected void shutDown() throws Exception {
-        removeShiftClickCustomizationMenus();
+        removeCustomOptions();
     }
 
     static String format(Date date) {
@@ -123,70 +101,44 @@ public class FriendsExporterPlugin extends Plugin {
         }
     }
 
-    @Subscribe
-    public void onMenuOptionClicked(MenuOptionClicked event) throws Exception {
-        refreshShiftClickCustomizationMenus();
+    private void addCustomOptions() {
+        menuManager.addManagedCustomMenu(FRIENDS_LIST, e -> exportFriendsList());
+        menuManager.addManagedCustomMenu(IGNORE_LIST, e -> exportIgnoreList());
+        menuManager.addManagedCustomMenu(CHAT_CHANNEL_LIST, e -> exportChatChannelMembers());
+        menuManager.addManagedCustomMenu(CHAT_CHANNEL_RANKS, e -> exportChatChannelRankList());
+        menuManager.addManagedCustomMenu(CLAN_CHAT_MEMBERS, e -> exportOnlineClanMembers());
+        menuManager.addManagedCustomMenu(CLAN_CHAT_JOINS, e -> exportAllClanMembers());
+        menuManager.addManagedCustomMenu(CLAN_CHAT_BANS, e -> exportClanBanList());
+        menuManager.addManagedCustomMenu(CLAN_CHAT_EVENTS, e -> exportClanEventList());
+        menuManager.addManagedCustomMenu(EMOTES, e -> exportLocalPlayers());
     }
 
-    private void refreshShiftClickCustomizationMenus() {
-        this.removeShiftClickCustomizationMenus();
-        this.menuManager.addManagedCustomMenu(FIXED_FRIENDS_LIST, e -> exportFriendsList());
-        this.menuManager.addManagedCustomMenu(RESIZABLE_FRIENDS_LIST, e -> exportFriendsList());
-        this.menuManager.addManagedCustomMenu(MODERN_FRIENDS_LIST, e -> exportFriendsList());
-
-        this.menuManager.addManagedCustomMenu(FIXED_IGNORE_LIST, e -> exportIgnoreList());
-        this.menuManager.addManagedCustomMenu(RESIZABLE_IGNORE_LIST, e -> exportIgnoreList());
-        this.menuManager.addManagedCustomMenu(MODERN_IGNORE_LIST, e -> exportIgnoreList());
-
-        this.menuManager.addManagedCustomMenu(CHAT_CHANNEL_LIST, e -> exportChatChannelMembers());
-        this.menuManager.addManagedCustomMenu(CHAT_CHANNEL_RANKS, e -> exportChatChannelRankList());
-
-        this.menuManager.addManagedCustomMenu(FIXED_EMOTE, e -> exportLocalPlayers());
-        this.menuManager.addManagedCustomMenu(RESIZABLE_EMOTE, e -> exportLocalPlayers());
-        this.menuManager.addManagedCustomMenu(MODERN_EMOTE, e -> exportLocalPlayers());
-
-        this.menuManager.addManagedCustomMenu(CLAN_CHAT_MEMBERS, e -> exportOnlineClanMembers());
-        this.menuManager.addManagedCustomMenu(CLAN_CHAT_JOINS, e -> exportAllClanMembers());
-        this.menuManager.addManagedCustomMenu(CLAN_CHAT_BANS, e -> exportClanBanList());
-        this.menuManager.addManagedCustomMenu(CLAN_CHAT_EVENTS, e -> exportClanEventList());
-    }
-
-    private void removeShiftClickCustomizationMenus() {
-        this.menuManager.removeManagedCustomMenu(FIXED_FRIENDS_LIST);
-        this.menuManager.removeManagedCustomMenu(RESIZABLE_FRIENDS_LIST);
-        this.menuManager.removeManagedCustomMenu(MODERN_FRIENDS_LIST);
-
-        this.menuManager.removeManagedCustomMenu(FIXED_IGNORE_LIST);
-        this.menuManager.removeManagedCustomMenu(RESIZABLE_IGNORE_LIST);
-        this.menuManager.removeManagedCustomMenu(MODERN_IGNORE_LIST);
-
-        this.menuManager.removeManagedCustomMenu(CHAT_CHANNEL_LIST);
-        this.menuManager.removeManagedCustomMenu(CHAT_CHANNEL_RANKS);
-
-        this.menuManager.removeManagedCustomMenu(FIXED_EMOTE);
-        this.menuManager.removeManagedCustomMenu(RESIZABLE_EMOTE);
-        this.menuManager.removeManagedCustomMenu(MODERN_EMOTE);
-
-        this.menuManager.removeManagedCustomMenu(CLAN_CHAT_MEMBERS);
-        this.menuManager.removeManagedCustomMenu(CLAN_CHAT_JOINS);
-        this.menuManager.removeManagedCustomMenu(CLAN_CHAT_BANS);
-        this.menuManager.removeManagedCustomMenu(CLAN_CHAT_EVENTS);
+    private void removeCustomOptions() {
+        menuManager.removeManagedCustomMenu(FRIENDS_LIST);
+        menuManager.removeManagedCustomMenu(IGNORE_LIST);
+        menuManager.removeManagedCustomMenu(CHAT_CHANNEL_LIST);
+        menuManager.removeManagedCustomMenu(CHAT_CHANNEL_RANKS);
+        menuManager.removeManagedCustomMenu(CLAN_CHAT_MEMBERS);
+        menuManager.removeManagedCustomMenu(CLAN_CHAT_JOINS);
+        menuManager.removeManagedCustomMenu(CLAN_CHAT_BANS);
+        menuManager.removeManagedCustomMenu(CLAN_CHAT_EVENTS);
+        menuManager.removeManagedCustomMenu(EMOTES);
     }
 
     /**
      * Exports the player's Friends List.
      */
     private void exportFriendsList() {
-        String filename = this.client.getLocalPlayer().getName() + " Friends " + format(new Date()) + ".txt";
-        Friend array[] = this.client.getFriendContainer().getMembers();
+        String filename = client.getLocalPlayer().getName() + " Friends " + format(new Date()) + ".txt";
+        Friend[] array = client.getFriendContainer().getMembers();
         List<PlayerListItem> playerList = new ArrayList<>();
-        for (int i = 0; i != this.client.getFriendContainer().getMembers().length; ++i) {
+        for (int i = 0; i != client.getFriendContainer().getMembers().length; ++i) {
             PlayerListItem playerListItem = new PlayerListItem();
             playerListItem.setName(array[i].getName());
-            if (!StringUtils.isEmpty(array[i].getPrevName()) && this.config.includePrevName()) {
+            if (!StringUtils.isEmpty(array[i].getPrevName()) && config.includePrevName()) {
                 playerListItem.setPreviousName(array[i].getPrevName());
             }
-            if (this.config.includeNote()) {
+            if (config.includeNote()) {
                 playerListItem.setNote(configManager.getConfiguration("friendNotes", "note_" + playerListItem.getName()));
             }
             playerList.add(playerListItem);
@@ -199,16 +151,16 @@ public class FriendsExporterPlugin extends Plugin {
      * Exports the player's Ignore List.
      */
     private void exportIgnoreList() {
-        String filename = this.client.getLocalPlayer().getName() + " Ignore " + format(new Date()) + ".txt";
-        Ignore array[] = this.client.getIgnoreContainer().getMembers();
+        String filename = client.getLocalPlayer().getName() + " Ignore " + format(new Date()) + ".txt";
+        Ignore[] array = client.getIgnoreContainer().getMembers();
         List<PlayerListItem> playerList = new ArrayList<>();
         for (int i = 0; i != array.length; ++i) {
             PlayerListItem playerListItem = new PlayerListItem();
             playerListItem.setName(array[i].getName());
-            if (!StringUtils.isEmpty(array[i].getPrevName()) && this.config.includePrevName()) {
+            if (!StringUtils.isEmpty(array[i].getPrevName()) && config.includePrevName()) {
                 playerListItem.setPreviousName(array[i].getPrevName());
             }
-            if (this.config.includeNote()) {
+            if (config.includeNote()) {
                 playerListItem.setNote(configManager.getConfiguration("friendNotes", "note_" + playerListItem.getName()));
             }
             playerList.add(playerListItem);
@@ -221,42 +173,44 @@ public class FriendsExporterPlugin extends Plugin {
      * Exports all members of the player's own chat-channel. Requires the Chat-channel Setup widget to be open.
      */
     private void exportChatChannelRankList() {
-        String filename = this.client.getLocalPlayer().getName() + " Ranks " + format(new Date()) + ".txt";
-        Friend memberArray[] = this.client.getFriendContainer().getMembers();
-        Widget temp;
-        Widget[] temp2;
-        temp = this.client.getWidget(94, 28);
-        temp2 = temp.getChildren();
+        Friend[] friendsList = client.getFriendContainer().getMembers();
+        Widget channelSetupListWidget = client.getWidget(InterfaceID.ChatchannelSetup.LIST);
 
-        if (!chatChannel) {
-            this.client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open Chat-channel Setup found in the Chat-channel tab to export this list.", "");
+        if (channelSetupListWidget == null) {
+            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open Chat-channel Setup found in the Chat-channel tab to export this list.", "");
             return;
         }
 
+        Widget[] children = channelSetupListWidget.getChildren();
+        if (children == null) return;
+
         List<PlayerListItem> playerList = new ArrayList<>();
 
-        for (int i = 0; i < temp2.length/4; ++i) {
-            String rank = temp2[(i * 4) + 1].getText();
-            if(!rank.equals("Not ranked") || this.config.showUnranked()) {
+        for (int i = 0; i < children.length/4; ++i) {
+            String rank = children[(i * 4) + 1].getText();
+            if(!rank.equals("Not ranked") || config.showUnranked()) {
                 String prevName = "";
-                for (int j = 0; j < memberArray.length; ++j) {
-                    String friendName = memberArray[j].getName();
-                    if (friendName.equals(temp2[(i * 4) + 2].getText())) {
-                        if (!StringUtils.isEmpty(memberArray[j].getPrevName()) && this.config.includePrevName()) {
-                            prevName = memberArray[j].getPrevName();
+                if (config.includePrevName()) {
+                    for (Friend friend : friendsList) {
+                        String friendName = friend.getName();
+                        if (friendName.equals(children[(i * 4) + 2].getText())) {
+                            if (!StringUtils.isEmpty(friend.getPrevName())) {
+                                prevName = friend.getPrevName();
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
 
                 PlayerListItem playerListItem = new PlayerListItem();
-                playerListItem.setName(temp2[(i * 4) + 2].getText());
+                playerListItem.setName(children[(i * 4) + 2].getText());
                 playerListItem.setPreviousName(prevName);
                 playerListItem.setRank(!rank.equals("Not ranked") ? rank : "No Rank");
 
                 playerList.add(playerListItem);
             }
         }
+        String filename = client.getLocalPlayer().getName() + " Ranks " + format(new Date()) + ".txt";
         exportList(filename, playerList);
     }
 
@@ -267,22 +221,21 @@ public class FriendsExporterPlugin extends Plugin {
      * This was previously known as Friends Chat.
      */
     private void exportChatChannelMembers() {
-        String filename = this.client.getLocalPlayer().getName() + " Members " + format(new Date()) + ".txt";
-
-        if (this.client.getFriendsChatManager() == null) {
-            this.client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please join a Chat-channel to export this list.", "");
+        FriendsChatManager manager = client.getFriendsChatManager();
+        if (manager == null) {
+            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please join a Chat-channel to export this list.", "");
             return;
         }
 
-        FriendsChatMember array[] = this.client.getFriendsChatManager().getMembers();
-
+        FriendsChatMember[] members = manager.getMembers();
         List<PlayerListItem> playerList = new ArrayList<>();
-        for (int i = 0; i != this.client.getFriendsChatManager().getMembers().length; ++i) {
-            String friendName = array[i].getName();
+        for (int i = 0; i != client.getFriendsChatManager().getMembers().length; ++i) {
+            String friendName = members[i].getName();
             PlayerListItem playerListItem = new PlayerListItem();
             playerListItem.setName(friendName);
             playerList.add(playerListItem);
         }
+        String filename = manager.getOwner() + " Members " + format(new Date()) + ".txt";
         exportList(filename, playerList);
     }
 
@@ -290,8 +243,7 @@ public class FriendsExporterPlugin extends Plugin {
      * Exports loaded players around the user in-game.
      */
     private void exportLocalPlayers() {
-        String filename = this.client.getLocalPlayer().getName() + " Local " + format(new Date()) + ".txt";
-        List<Player> array = this.client.getPlayers();
+        List<Player> array = client.getPlayers();
         List<PlayerListItem> playerList = new ArrayList<>();
         for (int i = 0; i != array.size(); ++i) {
             String localName = array.get(i).getName();
@@ -301,6 +253,7 @@ public class FriendsExporterPlugin extends Plugin {
                 playerList.add(playerListItem);
             }
         }
+        String filename = client.getLocalPlayer().getName() + " Local " + format(new Date()) + ".txt";
         exportList(filename, playerList);
     }
 
@@ -308,9 +261,8 @@ public class FriendsExporterPlugin extends Plugin {
      * Exports currently online clan members.
      */
     private void exportOnlineClanMembers() {
-        String filename = this.client.getClanChannel().getName() + " Members " + format(new Date()) + ".txt";
         List<PlayerListItem> playerList = client.getClanChannel().getMembers().stream()
-                .sorted(Comparator.comparing(ClanChannelMember::getRank).reversed()
+                .sorted(Comparator.comparingInt((ClanChannelMember member) -> member.getRank().getRank()).reversed()
                         .thenComparing(ClanChannelMember::getName, String::compareToIgnoreCase))
                 .map((ClanChannelMember clanmate) -> {
                     PlayerListItem playerListItem = new PlayerListItem();
@@ -319,6 +271,7 @@ public class FriendsExporterPlugin extends Plugin {
                     return playerListItem;
                 })
                 .collect(Collectors.toList());
+        String filename = client.getClanChannel().getName() + " Members " + format(new Date()) + ".txt";
         exportList(filename, playerList);
     }
 
@@ -327,10 +280,9 @@ public class FriendsExporterPlugin extends Plugin {
      * Drops a message into game chat if required Widget is not open.
      */
     private void exportAllClanMembers() {
-        String filename = this.client.getClanChannel().getName() + " Full Member List " + format(new Date()) + ".txt";
-        Widget clanListWidget = client.getWidget(693,10);
+        Widget clanListWidget = client.getWidget(InterfaceID.ClansMembers.NAME);
         if (clanListWidget == null) {
-            this.client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open clan settings and navigate to the Members tab.", "");
+            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open clan settings and navigate to the Members tab.", "");
             return;
         }
 
@@ -342,6 +294,7 @@ public class FriendsExporterPlugin extends Plugin {
             playerListItem.setName(clanList[i].getText());
             playerList.add(playerListItem);
         }
+        String filename = client.getClanChannel().getName() + " Full Member List " + format(new Date()) + ".txt";
         exportList(filename, playerList);
     }
 
@@ -349,18 +302,16 @@ public class FriendsExporterPlugin extends Plugin {
      * Exports the ban list for your clan. Drops a message in game chat if the Clan Banlist isn't open.
      */
     private void exportClanBanList() {
-        String filename = this.client.getClanChannel().getName() + " Ban List " + format(new Date()) + ".txt";
-
-        Widget clanBanListWidget = client.getWidget(689,6);
+        Widget clanBanListWidget = client.getWidget(InterfaceID.ClansBanned.LIST_CONTENTS);
         if (clanBanListWidget == null) {
-            this.client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open clan settings and navigate to the Bans tab.", "");
+            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open clan settings and navigate to the Bans tab.", "");
             return;
         }
 
         int banSize = clanBanListWidget.getDynamicChildren().length/2;
         List<PlayerListItem> playerList = new ArrayList<>();
         for (int i = 0; i != banSize; ++i) {
-            String player = client.getWidget(689, 6).getDynamicChildren()[500+i].getText();
+            String player = clanBanListWidget.getDynamicChildren()[500+i].getText();
             if (player.isEmpty()) {
                 break;
             }
@@ -368,6 +319,7 @@ public class FriendsExporterPlugin extends Plugin {
             playerListItem.setName(player);
             playerList.add(playerListItem);
         }
+        String filename = client.getClanChannel().getName() + " Ban List " + format(new Date()) + ".txt";
         exportList(filename, playerList);
     }
 
@@ -376,46 +328,41 @@ public class FriendsExporterPlugin extends Plugin {
      * This is the only function that does not currently use exportList and instead does everything in it.
      */
     private void exportClanEventList() {
-        String filePath = EXPORT_DIR + "\\" + this.client.getClanChannel().getName() + " Events " + format(new Date()) + ".txt";
-        try {
-            purgeList(filePath);
-            Widget clanEventWidget = client.getWidget(703,11);
-            if (clanEventWidget == null) {
-                this.client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open clan settings and navigate to the Events tab.", "");
-                return;
-            }
-
-            int eventSize = clanEventWidget.getDynamicChildren().length;
-            FileWriter writer = new FileWriter(filePath, true);
-            for (int i = 0; i != eventSize; ++i) {
-                String world = Text.removeTags(client.getWidget(703, 11).getDynamicChildren()[i].getText());
-                String startDate = Text.removeTags(client.getWidget(703, 12).getDynamicChildren()[i].getText());
-                String startTime = Text.removeTags(client.getWidget(703, 13).getDynamicChildren()[i].getText());
-                String duration = Text.removeTags(client.getWidget(703, 14).getDynamicChildren()[i].getText());
-                String type = Text.removeTags(client.getWidget(703, 15).getDynamicChildren()[i].getText());
-                String focus = Text.removeTags(client.getWidget(703, 16).getDynamicChildren()[i].getText());
-                String subType = Text.removeTags(client.getWidget(703, 17).getDynamicChildren()[i].getText());
-                String ranks = Text.removeTags(client.getWidget(703, 19).getDynamicChildren()[i].getText());
-
-                StringBuilder exportString = new StringBuilder();
-                if (!this.config.lineLeads().equals(LineLeads.None)) {
-                    exportString.append(i + this.config.lineLeads().getPunctuation());
-                }
-                exportString.append(
-                        focus + config.getSeparator() + type
-                              + config.getSeparator() + subType
-                              + config.getSeparator() + startDate + " " + startTime
-                              + config.getSeparator() + duration
-                              + config.getSeparator() + world
-                              + config.getSeparator() + ranks
-                );
-
-                writer.write(exportString + "\r\n");
-            }
-            writer.close();
-        } catch (IOException e) {
-            System.err.println("Failed to create file: " + filePath + ". Stack trace: " + e);
+        Widget clanEventWidget = client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_WORLD);
+        if (clanEventWidget == null) {
+            client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Please open clan settings and navigate to the Events tab.", "");
+            return;
         }
+
+        int eventSize = clanEventWidget.getDynamicChildren().length;
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i != eventSize; ++i) {
+            String world = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_WORLD).getDynamicChildren()[i].getText());
+            String startDate = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_DATE).getDynamicChildren()[i].getText());
+            String startTime = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_TIME).getDynamicChildren()[i].getText());
+            String duration = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_DURATION).getDynamicChildren()[i].getText());
+            String type = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_TYPE).getDynamicChildren()[i].getText());
+            String focus = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_ACTIVITY).getDynamicChildren()[i].getText());
+            String subType = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_SUBTYPE).getDynamicChildren()[i].getText());
+            String ranks = Text.removeTags(client.getWidget(InterfaceID.ClansEvents.LIST_CONTENTS_RANK_TO_VIEW).getDynamicChildren()[i].getText());
+
+            StringBuilder exportString = new StringBuilder();
+            if (!config.lineLeads().equals(LineLeads.None)) {
+                exportString.append(i + config.lineLeads().getPunctuation());
+            }
+            exportString.append(
+                    focus + config.getSeparator() + type
+                            + config.getSeparator() + subType
+                            + config.getSeparator() + startDate + " " + startTime
+                            + config.getSeparator() + duration
+                            + config.getSeparator() + world
+                            + config.getSeparator() + ranks
+            );
+
+            lines.add(exportString.toString());
+        }
+        String filename = client.getClanChannel().getName() + " Events " + format(new Date()) + ".txt";
+        exportToFile(filename, lines);
     }
 
     /**
@@ -424,23 +371,38 @@ public class FriendsExporterPlugin extends Plugin {
      * @param playerList List of PlayerListItems containing relevant information for exporting
      */
     private void exportList(String filename, List<PlayerListItem> playerList) {
-        String filePath = EXPORT_DIR + "\\" + filename;
-        purgeList(filePath);
-        try {
-            FileWriter writer = new FileWriter(filePath, true);
-            for (int i = 0; i < playerList.size(); ++i) {
-                writer.write(getExportLineForPlayer(i + 1, playerList.get(i)) + "\r\n");
-            }
-            writer.close();
-        } catch (IOException e) {
-            System.err.println("Failed to create file: " + filePath + ". Stack trace: " + e);
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i < playerList.size(); i++) {
+            lines.add(getExportLineForPlayer(i + 1, playerList.get(i)));
         }
+        exportToFile(filename, lines);
     }
 
-    private void purgeList(String filename) {
-        File purge = new File(filename);
-        purge.delete();
+    /**
+     * Writes a list of lines to a file using the injected executor.
+     */
+    private void exportToFile(String filename, List<String> lines) {
+        String filePath = EXPORT_DIR + File.separator + filename;
+
+        executor.submit(() -> {
+            File file = new File(filePath);
+
+            if (file.exists() && !file.delete()) {
+                log.error("Failed to delete existing file: {}", filePath);
+                return;
+            }
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, true))) {
+                for (String line : lines) {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            } catch (IOException e) {
+                log.error("Failed to write export file: {}", filePath, e);
+            }
+        });
     }
+
 
     /**
      * Puts together the text for one {@link PlayerListItem}.
@@ -451,25 +413,25 @@ public class FriendsExporterPlugin extends Plugin {
      */
     private String getExportLineForPlayer(int num, PlayerListItem playerListItem) {
 
-        String separator = this.config.getSeparator();
+        String separator = config.getSeparator();
 
         StringBuilder exportString = new StringBuilder();
-        if (!this.config.lineLeads().equals(LineLeads.None)) {
-            exportString.append(num + this.config.lineLeads().getPunctuation());
+        if (!config.lineLeads().equals(LineLeads.None)) {
+            exportString.append(num).append(config.lineLeads().getPunctuation());
         }
 
         if (!playerListItem.getRank().isEmpty()) {
-            exportString.append(playerListItem.getRank() + separator);
+            exportString.append(playerListItem.getRank()).append(separator);
         }
 
         exportString.append(playerListItem.getName());
 
         if (!StringUtils.isEmpty(playerListItem.getPreviousName())) {
-            exportString.append(separator + playerListItem.getPreviousName());
+            exportString.append(separator).append(playerListItem.getPreviousName());
         }
 
         if (!StringUtils.isEmpty(playerListItem.getNote())) {
-            exportString.append(separator + playerListItem.getNote());
+            exportString.append(separator).append(playerListItem.getNote());
         }
 
         return exportString.toString();
@@ -478,26 +440,5 @@ public class FriendsExporterPlugin extends Plugin {
     @Provides
     FriendsExporterConfig provideConfig(ConfigManager configManager) {
         return configManager.getConfig(FriendsExporterConfig.class);
-    }
-
-    @Subscribe
-    public void onWidgetLoaded(WidgetLoaded widget) {
-        if (widget.getGroupId() == 94) {
-            wid = true;
-            chatChannel = true;
-        }
-        Widget temp = this.client.getWidget(widget.getGroupId(),0);
-    }
-    @Subscribe
-    public void onGameTick(GameTick event) {
-        if (this.client.getWidget(94,28) == null) {
-            chatChannel = false;
-            refreshShiftClickCustomizationMenus();
-        }
-
-        if (wid) {
-            refreshShiftClickCustomizationMenus();
-            wid = false;
-        }
     }
 }
